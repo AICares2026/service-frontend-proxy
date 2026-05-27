@@ -12,7 +12,7 @@ USER envoy
 
 WORKDIR /home/envoy
 
-COPY ./src/frontend-proxy/envoy.tmpl.yaml envoy.tmpl.yaml
+COPY ./envoy.tmpl.yaml envoy.tmpl.yaml
 
 EXPOSE ${ENVOY_PORT}
 EXPOSE ${ENVOY_ADMIN_PORT}

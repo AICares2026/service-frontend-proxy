@@ -1,0 +1,47 @@
+You are an autonomous code-maintenance agent. Your task is to harden Dockerfiles in this codebase according to the rules below. You will make changes directly. You cannot ask questions. Follow every rule precisely.
+
+---
+
+## SCOPE: FILES TO SCAN
+
+- Find every file named exactly `Dockerfile` or matching `Dockerfile.*` (e.g., `Dockerfile.dev`, `Dockerfile.prod`) in the repository, at any directory depth.
+- Also scan files named `*.dockerfile` (case-insensitive).
+- Do **not** modify Docker Compose files, `.dockerignore` files, CI YAML files, shell scripts, or any non-Dockerfile file.
+- Process each Dockerfile independently and completely before moving to the next.
+
+---
+
+## RULE 1 — PIN BASE IMAGES TO A SPECIFIC DIGEST OR IMMUTABLE TAG
+
+**What to look for:**
+- Any `FROM` line using a mutable or unpinned tag, including:
+  - `FROM image:latest`
+  - `FROM image` (implicit `latest`)
+  - `FROM image:version` where the version is a mutable floating tag (e.g., `node:18`, `python:3.11`, `ubuntu:22.04` without a digest)
+- Multi-stage builds have multiple `FROM` lines — each must be evaluated independently.
+- Intermediate/builder stages (e.g., `FROM node:18 AS builder`) require the same treatment as final stages.
+
+**How to fix:**
+1. Resolve the current digest for the image+tag by examining any existing lockfiles, `.digest` files, or comments in the repo that record pinned digests.
+2. If a digest is already recorded in the repo (e.g., in a comment `# digest: sha256:...` immediately above the `FROM` line, or in a `docker-bake.hcl`, or a `digests.lock` file), use that recorded digest.
+3. If no digest is recorded anywhere in the repo, **do not guess or fabricate a digest**. Instead:
+   - Change `FROM image:latest` → keep as `FROM image:latest` and add a comment on the line immediately above: `# TODO: pin to digest — run: docker pull image:latest && docker inspect --format='{{index .RepoDigests 0}}' image:latest`
+   - Change `FROM image` (bare, no tag) → change to `FROM image:latest` and add the same TODO comment on the line immediately above.
+   - Change `FROM image:tag` (any non-digest tag) → keep the tag and add a TODO comment on the line immediately above: `# TODO: pin to digest — run: docker pull image:tag && docker inspect --format='{{index .RepoDigests 0}}' image:tag`
+4. If a digest is already present in the `FROM` line (e.g., `FROM image@sha256:abc123` or `FROM image:tag@sha256:abc123`), leave it entirely untouched.
+5. Preserve any `AS stagename` alias after the image reference. The corrected form with a digest would be `FROM image:tag@sha256:... AS stagename`.
+6. Do not add duplicate TODO comments if one already exists immediately above the `FROM` line with identical wording.
+
+**What to leave alone:**
+- `FROM scratch` — never modify this under any circumstances.
+- `FROM --platform=...` flags — preserve them exactly as-is; only modify the image reference portion, not the platform flag.
+- Build-arg patterns like `FROM ${BASE_IMAGE}` or `FROM ${BASE_IMAGE}:${TAG}` — add a comment on the line immediately above warning that pinning must be done at build time, but do not alter the `FROM` line itself: `# TODO: ensure BASE_IMAGE is set to a digest-pinned reference at build time`
+- Registry prefixes (e.g., `FROM gcr.io/distroless/base:nonroot`, `FROM public.ecr.aws/lambda/python:3.11`) — treat exactly like unqualified image names; only the digest/tag portion is in scope.
+
+---
+
+## RULE 2 — USE A NON-ROOT USER
+
+**What to look for:**
+- Any Dockerfile that does **not** contain a `USER` instruction before the final `CMD`, `ENTRYPOINT`, or `EXPOSE` instruction.
+- Also flag Dockerfiles where `USER root` or `USER 0` appears as

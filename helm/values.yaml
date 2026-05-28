@@ -1,7 +1,10 @@
 service:
   name: service-frontend-proxy
+  namespace: aicares
 image:
   repository: 952893849914.dkr.ecr.us-east-1.amazonaws.com/aicares-application/frontend-proxy
+  tag: latest
+  pullPolicy: Always
 containerPort: 8080
 serviceType: LoadBalancer
 resources:
@@ -11,13 +14,55 @@ resources:
     memory: "32Mi"
     cpu: "50m"
 env:
+  - name: ENVOY_ADDR
+    value: "0.0.0.0"
+  - name: ENVOY_PORT
+    value: "8080"
+  - name: ENVOY_ADMIN_PORT
+    value: "10000"
   - name: FRONTEND_HOST
     value: "frontend"
   - name: FRONTEND_PORT
     value: "8080"
+  - name: IMAGE_PROVIDER_HOST
+    value: "image-provider"
+  - name: IMAGE_PROVIDER_PORT
+    value: "8081"
+  - name: FLAGD_HOST
+    value: "flagd"
+  - name: FLAGD_PORT
+    value: "8013"
+  - name: FLAGD_UI_HOST
+    value: "flagd-ui"
+  - name: FLAGD_UI_PORT
+    value: "4000"
+  - name: LOCUST_WEB_HOST
+    value: "load-generator"
+  - name: LOCUST_WEB_PORT
+    value: "8089"
+  - name: GRAFANA_HOST
+    value: "grafana"
+  - name: GRAFANA_PORT
+    value: "3000"
+  - name: JAEGER_HOST
+    value: "jaeger"
+  - name: JAEGER_UI_PORT
+    value: "16686"
+  - name: OTEL_COLLECTOR_HOST
+    value: "otel-collector"
+  - name: OTEL_COLLECTOR_PORT_GRPC
+    value: "4317"
+  - name: OTEL_COLLECTOR_PORT_HTTP
+    value: "4318"
+  - name: OTEL_SERVICE_NAME
+    value: "frontend-proxy"
   - name: TELEMETRY_DOCS_HOST
     value: "telemetry-docs"
   - name: TELEMETRY_DOCS_PORT
     value: "8000"
+  - name: FIREPIT_HOST
+    value: "firepit"
+  - name: FIREPIT_PORT
+    value: "8080"
 nodeSelector:
   eks.amazonaws.com/nodegroup: graviton-workers

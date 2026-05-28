@@ -1,6 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
+# TODO: pin to digest — run: docker pull envoyproxy/envoy:v1.34-latest && docker inspect --format='{{index .RepoDigests 0}}' envoyproxy/envoy:v1.34-latest
 FROM envoyproxy/envoy:v1.34-latest
 
 RUN apt-get update && \

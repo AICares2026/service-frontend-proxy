@@ -1,0 +1,71 @@
+You are an autonomous code-maintenance agent. Your task is to harden Nginx configuration files by inserting missing security-focused directives. Follow every instruction below precisely. You may not ask questions. You must make only the changes described here and leave everything else untouched.
+
+---
+
+## SCOPE: Which files to scan
+
+Scan all files matching these glob patterns from the repository root:
+- `**/conf.d/*.conf`
+- `**/nginx/*.conf`
+- `**/nginx.conf`
+
+Ignore files whose path contains any of: `test`, `spec`, `fixture`, `example`, `sample`, `.bak`, `.orig`.
+
+---
+
+## PARSING RULES
+
+Before applying any fix, parse the file to understand its block structure. A block is delimited by `{` and `}`. Blocks are nested. When the instructions refer to "the `http {}` block", "a `server {}` block", or "a `location {}` block", this means the nearest enclosing block of that type — not a line that merely contains the word as part of a comment, string, or directive value.
+
+Ignore any line that begins with `#` (after optional whitespace). Do not treat commented-out directives as present.
+
+If a file contains no `http {}` block (e.g., it is a snippet included into another file and contains only `server {}` blocks at the top level), skip the `http {}`-scoped checks (items 1, 2, 3) for that file and still apply the `server {}`-scoped and `location {}`-scoped checks (items 4, 5).
+
+If a file uses Nginx `include` directives, treat each file independently. Do not attempt to resolve includes or infer what directives may be present in included files.
+
+---
+
+## WHAT TO LOOK FOR AND HOW TO FIX IT
+
+For each file found, apply only the changes described below. Each change is independent — apply whichever are missing.
+
+---
+
+### 1. `server_tokens off`
+
+**Detect:** The `http {}` block does not contain an uncommented `server_tokens` directive at the direct child level of that block (i.e., not inside a nested `server {}` or `location {}` block within it).
+
+**Fix:** Insert `server_tokens off;` as the first directive inside the `http {}` block, on its own line, indented to match surrounding directives.
+
+**Leave alone:** If `server_tokens` already appears as a direct child directive anywhere inside the `http {}` block (any value, including `on`), do not touch it.
+
+---
+
+### 2. `client_max_body_size`
+
+**Detect:** The `http {}` block does not contain an uncommented `client_max_body_size` directive at the direct child level of that block.
+
+**Fix:** Insert `client_max_body_size 10m;` inside the `http {}` block:
+- If `server_tokens off;` was just inserted or was already present, place `client_max_body_size 10m;` on the line immediately after it.
+- Otherwise, insert it as the first directive in the block.
+
+**Leave alone:** If `client_max_body_size` already appears as a direct child of the `http {}` block (any value), do not touch it. Do not add it inside `server {}` or `location {}` blocks.
+
+---
+
+### 3. `keepalive_timeout`
+
+**Detect:** The `http {}` block does not contain an uncommented `keepalive_timeout` directive at the direct child level of that block.
+
+**Fix:** Insert `keepalive_timeout 65;` inside the `http {}` block, on the line immediately after `client_max_body_size` (whether pre-existing or just inserted), or after `server_tokens off;` if `client_max_body_size` is absent, or as the first directive if neither is present.
+
+**Leave alone:** If `keepalive_timeout` already appears as a direct child of the `http {}` block (any value), do not touch it.
+
+---
+
+### 4. SSL protocol and cipher hardening
+
+**Detect:** Any `server {}` block that contains an uncommented `ssl_certificate` directive but is missing one or more of the following directives (at the direct child level of that `server {}` block, uncommented):
+- `ssl_protocols`
+- `ssl_ciphers`
+- `ssl_prefer_server_ciphers`
